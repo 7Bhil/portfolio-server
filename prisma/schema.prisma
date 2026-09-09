@@ -1,0 +1,92 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String   @default("Bhilal CHITOU")
+  role      String   @default("ADMIN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  titleFr     String
+  titleEn     String
+  descFr      String
+  descEn      String
+  problemFr   String?  @db.Text
+  problemEn   String?  @db.Text
+  decisionFr  String?  @db.Text
+  decisionEn  String?  @db.Text
+  impactFr    String?  @db.Text
+  impactEn    String?  @db.Text
+  solvedFr    String?  @db.Text
+  solvedEn    String?  @db.Text
+  category    String   @default("web")
+  image       String?
+  demoUrl     String?
+  githubUrl   String?
+  featured    Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Skill {
+  id        String   @id @default(uuid())
+  name      String
+  category  String
+  icon      String?
+  level     Int      @default(90)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Experience {
+  id         String   @id @default(uuid())
+  type       String   @default("experience")
+  roleFr     String
+  roleEn     String
+  companyFr  String
+  companyEn  String
+  descFr     String?  @db.Text
+  descEn     String?  @db.Text
+  dateFr     String
+  dateEn     String
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Certification {
+  id            String   @id @default(uuid())
+  title         String
+  issuer        String
+  date          String
+  credentialUrl String?
+  imageUrl      String?
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  subject   String?
+  message   String   @db.Text
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
