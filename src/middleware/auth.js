@@ -8,7 +8,11 @@ export const authenticateAdmin = (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const secret = process.env.JWT_SECRET || '7bhil_portfolio_super_secret_jwt_key_2026_benin';
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error('FATAL: JWT_SECRET environment variable is not set.');
+      return res.status(500).json({ error: 'Erreur de configuration serveur.' });
+    }
 
     const decoded = jwt.verify(token, secret);
     req.admin = decoded;

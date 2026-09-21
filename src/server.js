@@ -10,10 +10,38 @@ import messageRoutes from './routes/messages.js';
 import statRoutes from './routes/stats.js';
 import chatRoutes from './routes/chat.js';
 
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Security headers
+app.use(helmet());
+
+// Rate limiting
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Trop de requêtes, veuillez réessayer plus tard.' }
+});
+app.use(globalLimiter);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Trop de tentatives de connexion. Réessayez dans 15 minutes.' }
+});
+
+const chatLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 15,
+  message: { error: 'Limite de messages IA atteinte. Réessayez dans une minute.' }
+});
 
 // Middleware
 app.use(cors());
@@ -30,14 +58,14 @@ app.get('/api/health', (req, res) => {
 });
 
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/skills', skillRoutes);
 app.use('/api/experiences', experienceRoutes);
 app.use('/api/certifications', certificationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/stats', statRoutes);
-app.use('/api/chat', chatRoutes);
+app.use('/api/chat', chatLimiter, chatRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

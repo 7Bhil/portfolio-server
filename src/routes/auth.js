@@ -26,7 +26,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Identifiants incorrects.' });
     }
 
-    const secret = process.env.JWT_SECRET || '7bhil_portfolio_super_secret_jwt_key_2026_benin';
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error('FATAL: JWT_SECRET environment variable is not set.');
+      return res.status(500).json({ error: 'Erreur de configuration serveur.' });
+    }
     const token = jwt.sign(
       { id: admin.id, email: admin.email, name: admin.name, role: admin.role },
       secret,
