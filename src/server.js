@@ -31,14 +31,16 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-const authLimiter = rateLimit({
+export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { error: 'Trop de tentatives de connexion. Réessayez dans 15 minutes.' }
 });
 
 const chatLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
+  windowMs: 1 * 60 * 1000, // 1 minute
   max: 15,
   message: { error: 'Limite de messages IA atteinte. Réessayez dans une minute.' }
 });
@@ -58,7 +60,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // API Routes
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/skills', skillRoutes);
 app.use('/api/experiences', experienceRoutes);
