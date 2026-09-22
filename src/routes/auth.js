@@ -1,13 +1,12 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 import { authenticateAdmin } from '../middleware/auth.js';
 
 import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

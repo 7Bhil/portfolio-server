@@ -1,8 +1,7 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 const SYSTEM_INSTRUCTION = `
 Tu es l'assistant commercial et conseiller technique d'élite de Bhilal CHITOU, Ingénieur Logiciel Full-Stack & Mobile de haut niveau.
