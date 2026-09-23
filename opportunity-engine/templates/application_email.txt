@@ -1,0 +1,16 @@
+Bonjour {contact_name},
+
+Je me permets de vous contacter au sujet de l'opportunité de {role} au sein de {company}.
+
+Je suis développeur Full-Stack & Mobile, spécialisé dans l'écosystème {stack}. Je recherche activement une opportunité motivante où je peux apporter de la valeur dès le premier jour sur vos projets web et applicatifs.
+
+Vous pouvez consulter mon parcours et mes réalisations sur mon portfolio en ligne :
+{portfolio}
+
+Je serais ravi d'échanger avec vous si mon profil correspond aux besoins de votre équipe technique.
+
+Bien cordialement,
+
+{sender_name}
+{sender_email}
+{sender_github}
