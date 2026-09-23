@@ -90,3 +90,147 @@ model Message {
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 }
+
+// =========================================================
+// OPPORTUNITY ENGINE MODELS
+// =========================================================
+
+model Source {
+  id                  Int           @id @default(autoincrement())
+  name                String        @unique
+  enabled             Boolean       @default(true)
+  consecutiveFailures Int           @default(0) @map("consecutive_failures")
+  lastSuccessAt       DateTime?     @map("last_success_at")
+  lastFailureAt       DateTime?     @map("last_failure_at")
+  lastFailureReason   String?       @map("last_failure_reason") @db.Text
+  disabledAt          DateTime?     @map("disabled_at")
+  disabledReason      String?       @map("disabled_reason") @db.Text
+  createdAt           DateTime      @default(now()) @map("created_at")
+
+  opportunities       Opportunity[]
+
+  @@map("sources")
+}
+
+model Company {
+  id             Int           @id @default(autoincrement())
+  name           String
+  website        String?
+  country        String?
+  domainSignal   String?       @map("domain_signal")
+  stackDetected  String[]      @map("stack_detected")
+  firstSeen      DateTime      @default(now()) @map("first_seen")
+  lastSeen       DateTime      @default(now()) @map("last_seen")
+
+  opportunities  Opportunity[]
+
+  @@unique([name, website])
+  @@map("companies")
+}
+
+model Opportunity {
+  id            Int                  @id @default(autoincrement())
+  companyId     Int?                 @map("company_id")
+  sourceId      Int?                 @map("source_id")
+  type          String               // 'offre' ou 'spontanee'
+  role          String
+  jobUrl        String?              @map("job_url")
+  remote        Boolean              @default(false)
+  country       String?
+  stackRequired String[]             @map("stack_required")
+  score         Int?
+  status        String               @default("NEW") // NEW, RESEARCHED, READY, APPROVED, SENDING, SEND_UNKNOWN, SENT, FOLLOW_UP, REPLIED, REJECTED, CLOSED
+  dedupeKey     String               @unique @map("dedupe_key")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+
+  company       Company?             @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  source        Source?              @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  contacts      OpportunityContact[]
+  messages      OpportunityMessage[]
+
+  @@index([status], map: "idx_opportunities_status")
+  @@index([score(sort: Desc)], map: "idx_opportunities_score")
+  @@index([createdAt(sort: Desc)], map: "idx_opportunities_created_at")
+  @@index([sourceId], map: "idx_opportunities_source_id")
+  @@index([companyId], map: "idx_opportunities_company_id")
+  @@map("opportunities")
+}
+
+model OpportunityContact {
+  id              Int         @id @default(autoincrement())
+  opportunityId   Int         @map("opportunity_id")
+  fullName        String?     @map("full_name")
+  role            String?
+  email           String?
+  emailConfidence Int?        @map("email_confidence")
+  linkedinUrl     String?     @map("linkedin_url")
+  verified        Boolean     @default(false)
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  opportunity     Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@unique([opportunityId, email])
+  @@index([opportunityId], map: "idx_contacts_opportunity_id")
+  @@map("contacts")
+}
+
+model OpportunityMessage {
+  id                 Int         @id @default(autoincrement())
+  opportunityId      Int         @map("opportunity_id")
+  generatedBy        String      @map("generated_by") // 'gemini', 'deepseek', 'template'
+  content            String      @db.Text
+  editedByUser       Boolean     @default(false) @map("edited_by_user")
+  sendStatus         String      @default("NOT_SENT") @map("send_status") // NOT_SENT, SENDING, SENT, FAILED, UNKNOWN
+  provider           String?     // 'resend', 'gmail'
+  idempotencyKey     String?     @unique @map("idempotency_key")
+  providerMessageId  String?     @map("provider_message_id")
+  sentAt             DateTime?   @map("sent_at")
+  followUp1At        DateTime?   @map("follow_up_1_at")
+  followUp2At        DateTime?   @map("follow_up_2_at")
+  followUp3At        DateTime?   @map("follow_up_3_at")
+  createdAt          DateTime    @default(now()) @map("created_at")
+
+  opportunity        Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([idempotencyKey], map: "idx_messages_idempotency_key")
+  @@index([sendStatus], map: "idx_messages_send_status")
+  @@map("messages_opportunities")
+}
+
+model SystemLog {
+  id        Int      @id @default(autoincrement())
+  runId     String   @map("run_id")
+  step      String
+  status    String   // 'OK', 'WARNING', 'ERROR', 'CRITICAL'
+  message   String?  @db.Text
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([runId], map: "idx_system_logs_run_id")
+  @@index([status, createdAt(sort: Desc)], map: "idx_system_logs_status_created_at")
+  @@map("system_logs")
+}
+
+model AlertState {
+  alertKey       String   @id @map("alert_key")
+  lastAlertedAt  DateTime @default(now()) @map("last_alerted_at")
+  cooldownMinutes Int     @default(60) @map("cooldown_minutes")
+
+  @@map("alert_state")
+}
+
+model PipelineRun {
+  id                   Int       @id @default(autoincrement())
+  runId                String    @unique @map("run_id")
+  startedAt            DateTime  @default(now()) @map("started_at")
+  finishedAt           DateTime? @map("finished_at")
+  status               String    @default("RUNNING") // RUNNING, SUCCESS, PARTIAL, FAILED
+  opportunitiesFound   Int       @default(0) @map("opportunities_found")
+  opportunitiesCreated Int       @default(0) @map("opportunities_created")
+  opportunitiesReady   Int       @default(0) @map("opportunities_ready")
+  errorCount           Int       @default(0) @map("error_count")
+
+  @@index([status, startedAt(sort: Desc)], map: "idx_pipeline_runs_status_started_at")
+  @@map("pipeline_runs")
+}
