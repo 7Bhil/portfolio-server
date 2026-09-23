@@ -50,13 +50,30 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// Healthcheck Route
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'Backend Portfolio 7Bhil opérationnel (Neon PostgreSQL)',
-    timestamp: new Date().toISOString()
-  });
+import opportunityRoutes from './routes/opportunities.js';
+import prisma from './lib/prisma.js';
+
+// Healthcheck Liveness Route (< 50ms)
+app.get('/health', (req, res) => res.json({ status: 'pong' }));
+app.get('/api/health', (req, res) => res.json({ status: 'pong' }));
+
+// Readiness Route (vérifie la connexion active Neon PostgreSQL)
+app.get(['/ready', '/api/ready'], async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({
+      status: 'ready',
+      database: 'ok',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Readiness check failed:', err.message);
+    res.status(503).json({
+      status: 'not_ready',
+      database: 'error',
+      error: 'Impossible de joindre la base de données'
+    });
+  }
 });
 
 // API Routes
@@ -67,6 +84,7 @@ app.use('/api/experiences', experienceRoutes);
 app.use('/api/certifications', certificationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/stats', statRoutes);
+app.use('/api/opportunities', opportunityRoutes);
 app.use('/api/chat', chatLimiter, chatRoutes);
 
 // Error Handling Middleware
