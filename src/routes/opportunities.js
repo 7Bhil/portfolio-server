@@ -422,5 +422,60 @@ router.get('/system/health', authenticateAdmin, async (req, res) => {
   }
 });
 
+// POST /api/opportunities/prospect-send - Envoi direct d'email ciblé à un prospect CRM
+router.post('/prospect-send', authenticateAdmin, async (req, res) => {
+  try {
+    const { to, companyName, subject, message } = req.body;
+
+    if (!to || !message) {
+      return res.status(400).json({ error: 'Destinataire et contenu du message obligatoires.' });
+    }
+
+    const emailSubject = subject || `Candidature - Ingénieur Full-Stack & Fintech (${companyName || ''})`;
+    const resendApiKey = process.env.RESEND_API_KEY;
+
+    if (!resendApiKey) {
+      console.warn("⚠️ RESEND_API_KEY absente. Simulation d'envoi prospect.");
+      return res.json({
+        success: true,
+        simulated: true,
+        message: 'Envoi simulé en environnement de développement.'
+      });
+    }
+
+    const idempotencyKey = `prospect_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    const emailRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': idempotencyKey
+      },
+      body: JSON.stringify({
+        from: 'Bhilal CHITOU <candidature@7bhil.com>',
+        to: [to],
+        subject: emailSubject,
+        text: message
+      })
+    });
+
+    const resData = await emailRes.json();
+
+    if (emailRes.ok) {
+      return res.json({
+        success: true,
+        messageId: resData.id,
+        sentAt: new Date().toISOString()
+      });
+    } else {
+      return res.status(400).json({ error: resData.message || 'Erreur lors de l\'envoi via Resend.' });
+    }
+  } catch (error) {
+    console.error('Erreur prospect-send:', error);
+    res.status(500).json({ error: 'Erreur interne lors de l\'envoi au prospect.' });
+  }
+});
+
 export default router;
 
