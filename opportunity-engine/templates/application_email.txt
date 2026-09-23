@@ -1,0 +1,18 @@
+Bonjour {contact_name},
+
+Je me permets de vous contacter au sujet de l'opportunité de {role} au sein de {company}.
+
+Développeur Full-Stack & Mobile (React, Node.js, Python/Django, TypeScript, PostgreSQL), j'ai une solide pratique du développement web et applicatif de bout en bout (créateur du langage Bhilal et de plusieurs plateformes complètes en production).
+
+Vous pouvez découvrir mes projets, réalisations et code source sur mon portfolio en ligne :
+{portfolio}
+
+Je serais ravi d'échanger avec vous sur la manière dont mon profil et ma motivation peuvent s'intégrer au sein de votre équipe.
+
+Bien cordialement,
+
+{sender_name}
+Développeur Full-Stack & Mobile
+WhatsApp : +229 01 44 24 29 64
+Email : {sender_email}
+GitHub : {sender_github}

@@ -1,0 +1,56 @@
+name: Opportunity Engine
+
+on:
+  schedule:
+    # Exécution 2 fois par jour aux horaires stratégiques
+    # 07h00 UTC = 08h00 heure de Cotonou (UTC+1 fixe)
+    # 19h00 UTC = 20h00 heure de Cotonou (UTC+1 fixe)
+    - cron: "0 7 * * *"
+    - cron: "0 19 * * *"
+  workflow_dispatch:
+    inputs:
+      job_type:
+        description: "Type de job: 'full' (pipeline complet) ou 'health' (vérification Render/Neon)"
+        required: true
+        default: "full"
+      dry_run:
+        description: "Mode test à blanc sans écriture en base (true/false)"
+        required: false
+        default: "false"
+
+concurrency:
+  group: opportunity-engine
+  cancel-in-progress: false
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Configuration de Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Installation des dépendances
+        run: |
+          cd opportunity-engine
+          pip install -r requirements.txt
+
+      - name: Exécution du pipeline Opportunity Engine
+        run: |
+          cd opportunity-engine
+          python pipeline.py
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_EMAIL: 7bhil.chitou7@gmail.com
+          JOB_TYPE: ${{ github.event.inputs.job_type || 'full' }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
