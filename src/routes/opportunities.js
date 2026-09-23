@@ -352,4 +352,75 @@ router.post('/:id/reconcile', authenticateAdmin, async (req, res) => {
   }
 });
 
+// GET /api/opportunities/system/logs - Liste des logs système filtrables
+router.get('/system/logs', authenticateAdmin, async (req, res) => {
+  try {
+    const { status, limit = 50 } = req.query;
+    const where = {};
+    if (status) {
+      const statuses = status.split(',').map(s => s.trim());
+      where.status = { in: statuses };
+    }
+
+    const logs = await prisma.systemLog.findMany({
+      where,
+      take: parseInt(limit),
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(logs);
+  } catch (error) {
+    console.error('Erreur récupération logs:', error);
+    res.status(500).json({ error: 'Erreur lors de la récupération des logs système.' });
+  }
+});
+
+// GET /api/opportunities/system/runs - Liste des exécutions du pipeline
+router.get('/system/runs', authenticateAdmin, async (req, res) => {
+  try {
+    const runs = await prisma.pipelineRun.findMany({
+      take: 20,
+      orderBy: { startedAt: 'desc' }
+    });
+    res.json(runs);
+  } catch (error) {
+    console.error('Erreur récupération runs:', error);
+    res.status(500).json({ error: 'Erreur lors de la récupération des runs de pipeline.' });
+  }
+});
+
+// GET /api/opportunities/system/health - Diagnostic complet des services
+router.get('/system/health', authenticateAdmin, async (req, res) => {
+  try {
+    const startDb = Date.now();
+    await prisma.$queryRaw`SELECT 1`;
+    const dbLatencyMs = Date.now() - startDb;
+
+    const sources = await prisma.source.findMany();
+    const alertStates = await prisma.alertState.findMany();
+    const lastRun = await prisma.pipelineRun.findFirst({
+      orderBy: { startedAt: 'desc' }
+    });
+
+    res.json({
+      database: {
+        status: 'UP',
+        provider: 'Neon PostgreSQL',
+        latencyMs: dbLatencyMs
+      },
+      sources,
+      lastRun,
+      alertStates,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Erreur diagnostic santé:', error);
+    res.status(500).json({
+      database: { status: 'DOWN', error: error.message },
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 export default router;
+
