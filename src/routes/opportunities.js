@@ -62,8 +62,74 @@ router.get('/', authenticateAdmin, async (req, res) => {
   }
 });
 
+// GET /api/opportunities/export/csv - Export CSV complet (MUST be before /:id)
+router.get('/export/csv', authenticateAdmin, async (req, res) => {
+  try {
+    const opportunities = await prisma.opportunity.findMany({
+      orderBy: [{ score: 'desc' }, { createdAt: 'desc' }],
+      include: {
+        company: true,
+        contacts: { take: 1 },
+        messages: { orderBy: { createdAt: 'desc' }, take: 1 }
+      }
+    });
+
+    const escape = (v) => {
+      if (v === null || v === undefined) return '';
+      const s = String(v).replace(/"/g, '""');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s;
+    };
+
+    const headers = ['ID','Statut','Rôle','Entreprise','Score','Remote','Pays','Stack','URL Offre','Contact Email','Message Généré','Créé le'];
+    const rows = opportunities.map(o => [
+      o.id, o.status, o.role || '', o.company?.name || '', o.score,
+      o.remote ? 'Oui' : 'Non', o.country || '',
+      (o.stackRequired || []).join(' | '), o.jobUrl || '',
+      o.contacts[0]?.email || '',
+      o.messages[0]?.content?.replace(/\n/g, ' ').slice(0, 200) || '',
+      new Date(o.createdAt).toLocaleDateString('fr-FR')
+    ].map(escape).join(','));
+
+    const csv = [headers.join(','), ...rows].join('\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="opportunites_${new Date().toISOString().slice(0,10)}.csv"`);
+    res.send('\uFEFF' + csv);
+  } catch (error) {
+    console.error('Erreur export CSV:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'export CSV.' });
+  }
+});
+
+// GET /api/opportunities/system/activity - Activité pipeline 7 jours (MUST be before /:id)
+router.get('/system/activity', authenticateAdmin, async (req, res) => {
+  try {
+    const result = [];
+    for (let i = 6; i >= 0; i--) {
+      const start = new Date();
+      start.setDate(start.getDate() - i);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setHours(23, 59, 59, 999);
+
+      const [created, sent] = await Promise.all([
+        prisma.opportunity.count({ where: { createdAt: { gte: start, lte: end } } }),
+        prisma.opportunity.count({ where: { status: 'SENT', updatedAt: { gte: start, lte: end } } })
+      ]);
+      result.push({
+        date: start.toISOString().slice(0, 10),
+        label: start.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }),
+        created, sent
+      });
+    }
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur lors de la récupération de l\'activité.' });
+  }
+});
+
 // GET /api/opportunities/:id - Détail complet
 router.get('/:id', authenticateAdmin, async (req, res) => {
+
   try {
     const id = parseInt(req.params.id);
     const opportunity = await prisma.opportunity.findUnique({
@@ -505,4 +571,3 @@ router.post('/prospect-send', authenticateAdmin, async (req, res) => {
 });
 
 export default router;
-
