@@ -34,13 +34,14 @@ logger = logging.getLogger("opportunity-engine")
 
 def run_health_check(run_id: str) -> bool:
     """
-    Exécute le health check préventif sur le backend Render (/ready).
-    Gère le cold start croisé Render + Neon (3 tentatives avec timeout de 30s et pause de 20s).
+    Exécute le health check préventif.
+    1. Tente de joindre le backend Render (/ready).
+    2. En cas d'échec Render (cold start prolongé ou veille), teste directement la base Neon PostgreSQL.
     """
     url = f"{BACKEND_URL.rstrip('/')}/ready"
-    max_retries = 2
-    timeout_sec = 30
-    pause_sec = 20
+    max_retries = 1
+    timeout_sec = 15
+    pause_sec = 10
 
     logger.info(f"Démarrage du health check sur {url}...")
     for attempt in range(1, max_retries + 2):
@@ -54,17 +55,25 @@ def run_health_check(run_id: str) -> bool:
             else:
                 logger.warning(f"Backend a répondu avec le statut HTTP {res.status_code}.")
         except Exception as e:
-            logger.warning(f"Tentative {attempt} échouée (timeout ou indisponible): {e}")
+            logger.warning(f"Tentative {attempt} sur {url} non aboutie: {e}")
 
         if attempt <= max_retries:
-            logger.info(f"Attente de {pause_sec} secondes pour absorption du cold start...")
             time.sleep(pause_sec)
 
-    msg = f"Backend Render indisponible après {max_retries + 1} tentatives."
-    logger.critical(msg)
-    log_system(run_id, "health_check", "CRITICAL", msg)
-    send_system_alert("CRITICAL", "health_check", msg, run_id=run_id)
-    return False
+    logger.info("Test de repli : Vérification directe de la connexion Neon PostgreSQL...")
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        conn.close()
+        logger.info("Connexion directe Neon PostgreSQL RÉUSSIE (OK). Le pipeline peut s'exécuter.")
+        log_system(run_id, "health_check", "WARNING", "Backend Render en veille, mais connexion directe Neon OK.")
+        return True
+    except Exception as db_err:
+        msg = f"Impossible de joindre la base Neon ni le backend Render: {db_err}"
+        logger.critical(msg)
+        send_system_alert("CRITICAL", "health_check", msg, run_id=run_id)
+        return False
 
 def execute_pipeline():
     """Point d'entrée principal du pipeline."""
@@ -76,7 +85,7 @@ def execute_pipeline():
     # 1. Health check préventif
     is_healthy = run_health_check(run_id)
     if not is_healthy:
-        logger.error("Arrêt du pipeline : Backend non joignable.")
+        logger.error("Arrêt du pipeline : Ni le backend ni la base Neon ne sont joignables.")
         sys.exit(1)
 
     if JOB_TYPE == "health":
