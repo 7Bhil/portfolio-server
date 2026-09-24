@@ -19,7 +19,7 @@ from services.deduplication import build_dedupe_key
 from services.scoring import calculate_opportunity_score
 from services.contacts import extract_contact_from_text
 from services.messages import generate_opportunity_message
-from services.alerts import send_system_alert
+from services.alerts import send_system_alert, send_run_digest
 
 # Adaptateurs de sources
 from sources.remotive import RemotiveSource
@@ -110,6 +110,7 @@ def execute_pipeline():
     total_created = 0
     total_ready = 0
     error_count = 0
+    qual_opps = []
 
     # 4. Traitement par source isolée
     for source in sources:
@@ -158,21 +159,23 @@ def execute_pipeline():
                 # Scoring
                 score = calculate_opportunity_score(opp, contact)
 
-                # Génération message (uniquement si score >= 60)
-                message_data = None
-                if score >= MIN_SCORE_FOR_AI:
-                    content, provider = generate_opportunity_message(role, comp_name, opp.get("stack", []), contact)
-                    message_data = {
-                        "content": content,
-                        "generated_by": provider
-                    }
-                    # Temporisation pour quotas gratuits Gemini (2 secondes)
-                    time.sleep(2)
+                # Règle stricte demandée : Les scores inférieurs à 60 sont ignorés
+                if score < MIN_SCORE_FOR_AI:
+                    logger.debug(f"Opportunité ignorée car score insuffisant ({score} < {MIN_SCORE_FOR_AI}) : {comp_name} - {role}")
+                    continue
 
-                # Statut
-                status = "READY" if score >= 50 else "RESEARCHED"
-                if status == "READY":
-                    total_ready += 1
+                # Génération message systématique pour les opportunités retenues
+                content, provider = generate_opportunity_message(role, comp_name, opp.get("stack", []), contact)
+                message_data = {
+                    "content": content,
+                    "generated_by": provider
+                }
+                # Temporisation pour quotas gratuits Gemini (2 secondes)
+                time.sleep(2)
+
+                # Statut : READY (Score >= 60 garanti)
+                status = "READY"
+                total_ready += 1
 
                 if DRY_RUN:
                     logger.info(f"[DRY-RUN] Détectée : {comp_name} - {role} (Score: {score}/100, Statut: {status})")
@@ -198,6 +201,12 @@ def execute_pipeline():
                     created_id = insert_opportunity(opp_data)
                     if created_id:
                         total_created += 1
+                        qual_opps.append({
+                            "company": comp_name,
+                            "role": role,
+                            "score": score,
+                            "url": job_url
+                        })
 
             except Exception as opp_err:
                 error_count += 1
@@ -218,5 +227,18 @@ def execute_pipeline():
     log_system(run_id, "pipeline_end", "OK", f"Run terminé ({final_status}). Créées: {total_created}, Prêtes: {total_ready}.")
     logger.info(f"=== PIPELINE RUN TERMINÉ : Trouvées={total_found}, Créées={total_created}, Prêtes={total_ready}, Erreurs={error_count} ===")
 
+    # 7. Envoi du Digest Quotidien par e-mail
+    if not DRY_RUN:
+        qual_opps.sort(key=lambda x: x.get("score", 0), reverse=True)
+        send_run_digest(
+            run_id=run_id,
+            status=final_status,
+            found_count=total_found,
+            created_count=total_created,
+            ready_count=total_ready,
+            top_opportunities=qual_opps
+        )
+
 if __name__ == "__main__":
     execute_pipeline()
+

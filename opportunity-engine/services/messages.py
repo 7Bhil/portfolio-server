@@ -24,7 +24,7 @@ Rédige un message d'accroche personnalisé, professionnel, concis (maximum 150 
 
 Contraintes strictes :
 - Sois direct, humble et axé sur les résultats concrets.
-- Mentionne le portfolio {PROFILE['portfolio']}.
+- Inclus obligatoirement les liens vers mon portfolio {PROFILE['portfolio']} et mon profil LinkedIn {PROFILE['linkedin']}.
 - Pas de jargon pompeux, pas d'exagération.
 - Écris en français impeccable.
 """
@@ -48,7 +48,7 @@ def generate_with_deepseek(role: str, company: str, stack: list, contact_name: s
         "messages": [
             {
                 "role": "user",
-                "content": f"Rédige un e-mail de candidature concis et professionnel pour le poste de {role} chez {company}. Mon nom: Bhilal CHITOU, Full-Stack Dev. Portfolio: {PROFILE['portfolio']}."
+                "content": f"Rédige un e-mail de candidature concis et professionnel pour le poste de {role} chez {company}. Mon nom: Bhilal CHITOU, Full-Stack Dev. Portfolio: {PROFILE['portfolio']}. LinkedIn: {PROFILE['linkedin']}."
             }
         ]
     }
@@ -74,7 +74,8 @@ def generate_with_template(role: str, company: str, stack: list, contact_name: s
         portfolio=PROFILE["portfolio"],
         sender_name=PROFILE["name"],
         sender_email=PROFILE["email"],
-        sender_github=PROFILE["github"]
+        sender_github=PROFILE["github"],
+        sender_linkedin=PROFILE["linkedin"]
     )
 
 def generate_opportunity_message(role: str, company: str, stack: list, contact: dict = None) -> tuple:
