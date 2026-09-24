@@ -15,4 +15,5 @@ Bien cordialement,
 Développeur Full-Stack & Mobile
 WhatsApp : +229 01 44 24 29 64
 Email : {sender_email}
+LinkedIn : {sender_linkedin}
 GitHub : {sender_github}

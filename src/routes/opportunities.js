@@ -7,13 +7,23 @@ const router = express.Router();
 // GET /api/opportunities - Liste avec filtres et pagination
 router.get('/', authenticateAdmin, async (req, res) => {
   try {
-    const { status, type, remote, minScore, limit = 50, page = 1 } = req.query;
+    const { status, type, remote, minScore, startDate, endDate, limit = 50, page = 1 } = req.query;
 
     const where = {};
     if (status) where.status = status;
     if (type) where.type = type;
     if (remote !== undefined) where.remote = remote === 'true';
     if (minScore) where.score = { gte: parseInt(minScore) };
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
 
     const take = parseInt(limit);
     const skip = (parseInt(page) - 1) * take;
@@ -132,6 +142,23 @@ router.post('/:id/reject', authenticateAdmin, async (req, res) => {
     res.json({ success: true, status: updated.status });
   } catch (error) {
     res.status(500).json({ error: 'Erreur lors du rejet.' });
+  }
+});
+
+// DELETE /api/opportunities/:id - Suppression définitive d'une opportunité
+router.delete('/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    // Suppression des relations en cascade
+    await prisma.opportunityContact.deleteMany({ where: { opportunityId: id } });
+    await prisma.opportunityMessage.deleteMany({ where: { opportunityId: id } });
+    await prisma.opportunity.delete({ where: { id } });
+
+    res.json({ success: true, message: 'Opportunité supprimée définitivement.' });
+  } catch (error) {
+    console.error('Erreur suppression opportunité:', error);
+    res.status(500).json({ error: 'Erreur lors de la suppression de l\'opportunité.' });
   }
 });
 
