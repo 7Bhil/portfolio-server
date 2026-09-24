@@ -292,7 +292,7 @@ router.post('/:id/send', authenticateAdmin, async (req, res) => {
           'Idempotency-Key': idempotencyKey
         },
         body: JSON.stringify({
-          from: 'Bhilal CHITOU <candidature@7bhil.com>',
+          from: 'Bhilal CHITOU <onboarding@resend.dev>',
           to: [contact.email],
           subject: `Candidature - ${opp.role} (${opp.company?.name || ''})`,
           text: message.content
@@ -480,7 +480,7 @@ router.post('/prospect-send', authenticateAdmin, async (req, res) => {
         'Idempotency-Key': idempotencyKey
       },
       body: JSON.stringify({
-        from: 'Bhilal CHITOU <candidature@7bhil.com>',
+        from: 'Bhilal CHITOU <onboarding@resend.dev>',
         to: [to],
         subject: emailSubject,
         text: message
