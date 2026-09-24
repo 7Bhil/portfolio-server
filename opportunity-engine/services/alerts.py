@@ -72,10 +72,59 @@ Détails :
 {details or 'Aucun détail supplémentaire.'}
 
 Panel Admin :
-https://7bhil.com/admin
+https://7bhil.vercel.app/admin
 """
     try:
         send_email_resend(ALERT_EMAIL, subject, body)
         logger.info(f"Alerte e-mail {level} envoyée à {ALERT_EMAIL}.")
     except Exception as e:
         logger.error(f"Échec de l'envoi de l'alerte e-mail: {e}")
+
+def send_run_digest(run_id: str, status: str, found_count: int, created_count: int, ready_count: int, top_opportunities: list = None):
+    """
+    Envoie un e-mail de synthèse / digest à la fin de chaque run du pipeline.
+    """
+    subject = f"[Opportunity Engine] Rapport d'exécution : {ready_count} opportunités prêtes ({status})"
+    
+    top_lines = []
+    if top_opportunities:
+        for i, opp in enumerate(top_opportunities[:7], 1):
+            comp = opp.get("company", "Entreprise inconnue")
+            role = opp.get("role", "Rôle non spécifié")
+            score = opp.get("score", 0)
+            url = opp.get("url", "")
+            top_lines.append(f"{i}. [{score}/100] {role} chez {comp}\n   Lien : {url}")
+    
+    top_text = "\n\n".join(top_lines) if top_lines else "Aucune nouvelle opportunité qualifiée avec score >= 60 lors de ce run."
+
+    body = f"""Bonjour Bhilal,
+
+Voici le récapitulatif de la session de prospection Opportunity Engine :
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BILAN DU RUN ({run_id})
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Statut global      : {status}
+• Offres analysées   : {found_count}
+• Nouvelles retenues : {created_count} (score >= 60)
+• Prêtes à envoyer   : {ready_count}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TOP OPPORTUNITÉS QUALIFIÉES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{top_text}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VALIDATION & ENVOI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connecte-toi sur ton dashboard pour relire les messages personnalisés et envoyer tes candidatures en un clic :
+👉 https://7bhil.vercel.app/admin
+
+Bhilal CHITOU — Opportunity Engine Automatisé
+"""
+    try:
+        send_email_resend(ALERT_EMAIL, subject, body)
+        logger.info(f"Digest de run envoyé avec succès à {ALERT_EMAIL}.")
+    except Exception as e:
+        logger.error(f"Échec de l'envoi du digest de run: {e}")
+
