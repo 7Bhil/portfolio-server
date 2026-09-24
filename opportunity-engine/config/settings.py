@@ -36,7 +36,7 @@ PROFILE = {
     "role": "Développeur Full-Stack & Mobile",
     "portfolio": "https://7bhil.vercel.app",
     "github": "https://github.com/7Bhil",
-    "linkedin": "https://www.linkedin.com/in/bhilal-chitou/",
+    "linkedin": "https://www.linkedin.com/in/7bhil/",
     "email": "7bhilal.chitou7@gmail.com",
     "phone": "+229 01 44 24 29 64",
     "stack": [
