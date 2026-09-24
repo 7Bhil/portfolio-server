@@ -115,7 +115,7 @@ router.post('/', async (req, res) => {
         await prisma.message.create({
           data: {
             name: 'Prospect Chatbot IA',
-            email: lastUserMessage.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0] || 'lead-chatbot@7bhil.com',
+            email: lastUserMessage.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0] || 'lead-chatbot@7bhil.vercel.app',
             subject: 'Nouveau lead qualifié par le Chatbot IA',
             message: `Historique du chat :\n${messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n')}`
           }
