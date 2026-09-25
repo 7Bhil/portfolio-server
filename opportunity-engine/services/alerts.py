@@ -123,8 +123,15 @@ Connecte-toi sur ton dashboard pour relire les messages personnalisés et envoye
 Bhilal CHITOU — Opportunity Engine Automatisé
 """
     try:
-        send_email_resend(ALERT_EMAIL, subject, body)
-        logger.info(f"Digest de run envoyé avec succès à {ALERT_EMAIL}.")
+        from database.models import log_system
+        res = send_email_resend(ALERT_EMAIL, subject, body)
+        logger.info(f"Digest de run envoyé avec succès à {ALERT_EMAIL}: {res}")
+        log_system(run_id, "digest_email", "OK", f"Digest envoyé à {ALERT_EMAIL}", payload=res)
     except Exception as e:
         logger.error(f"Échec de l'envoi du digest de run: {e}")
+        try:
+            from database.models import log_system
+            log_system(run_id, "digest_email", "ERROR", f"Échec envoi digest à {ALERT_EMAIL}: {e}")
+        except Exception:
+            pass
 
