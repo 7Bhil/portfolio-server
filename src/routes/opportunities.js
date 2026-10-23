@@ -570,4 +570,156 @@ router.post('/prospect-send', authenticateAdmin, async (req, res) => {
   }
 });
 
+// GET /api/opportunities/prospects/sync-from-opportunities - Convertit les entreprises qualifiées des opportunités en prospects CRM
+router.get('/prospects/sync-from-opportunities', authenticateAdmin, async (req, res) => {
+  try {
+    const opps = await prisma.opportunity.findMany({
+      where: {
+        score: { gte: 60 }
+      },
+      include: {
+        company: true,
+        contacts: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
+
+    const prospects = [];
+    const seenCompanies = new Set();
+
+    for (const opp of opps) {
+      const companyName = opp.company?.name || 'Entreprise Tech';
+      const normKey = companyName.toLowerCase().trim();
+      if (seenCompanies.has(normKey)) continue;
+      seenCompanies.add(normKey);
+
+      const contactEmail = opp.contacts?.[0]?.email || `jobs@${(opp.company?.domain || companyName.toLowerCase().replace(/[^a-z0-9]/g, ''))}.com`;
+      const flagMap = {
+        'france': '🇫🇷', 'bénin': '🇧🇯', 'benin': '🇧🇯', 'canada': '🇨🇦',
+        'états-unis': '🇺🇸', 'usa': '🇺🇸', 'united states': '🇺🇸', 'uk': '🇬🇧',
+        'royaume-uni': '🇬🇧', 'ghana': '🇬🇭', 'nigeria': '🇳🇬', 'kenya': '🇰🇪',
+        'allemagne': '🇩🇪', 'germany': '🇩🇪'
+      };
+      const countryLow = (opp.country || '').toLowerCase();
+      let flag = '🌍';
+      for (const [key, f] of Object.entries(flagMap)) {
+        if (countryLow.includes(key)) {
+          flag = f;
+          break;
+        }
+      }
+
+      prospects.push({
+        id: `opp_${opp.id}_${normKey.replace(/[^a-z0-9]/g, '_')}`,
+        name: companyName,
+        website: opp.company?.website || opp.jobUrl || 'https://google.com',
+        country: opp.country || 'Remote / International',
+        flag,
+        status: 'READY',
+        sentDate: null,
+        recipient: contactEmail,
+        description: `Recrute activement sur le poste : ${opp.role}. Score d'adéquation de ${opp.score}/100 sur le stack Bhilal.`,
+        techStack: (opp.stackRequired && opp.stackRequired.length > 0) ? opp.stackRequired.join(', ') : 'React, TypeScript, Node.js, Python, PostgreSQL',
+        whyFit: `Opportunité détectée (${opp.role}). Besoin fort et confirmé sur la stack technique maîtrisée.`,
+        notes: `Importé automatiquement depuis l'offre d'emploi : ${opp.role} (${opp.company?.name || ''}).`
+      });
+    }
+
+    res.json({ prospects, count: prospects.length });
+  } catch (error) {
+    console.error('Erreur sync prospects from opportunities:', error);
+    res.status(500).json({ error: 'Erreur lors de la synchronisation des prospects.' });
+  }
+});
+
+// POST /api/opportunities/prospects/discover-ai - Chasse IA de nouveaux prospects via Gemini
+router.post('/prospects/discover-ai', authenticateAdmin, async (req, res) => {
+  try {
+    const { region = 'Afrique & Remote International', sector = 'Fintech & SaaS' } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY non configurée.' });
+    }
+
+    const prompt = `Tu es un chasseur de têtes et expert en prospection B2B tech pour Bhilal CHITOU, Ingénieur Logiciel Full-Stack & Mobile de haut niveau basé à Cotonou, Bénin.
+Profil de Bhilal :
+- Compétences phares : React, React Native, TypeScript, Node.js, Express, Python (Django), Go, PHP (Laravel), PostgreSQL, architectures résilientes, sécurité OWASP.
+- Créateur du langage de programmation Bhilal (compilateur transpilé JS).
+- Types de cibles : Startups en forte croissance, Fintechs, banques digitales, plateformes de télémigration ou SaaS remote-first.
+
+Tâche :
+Trouve EXACTEMENT 5 entreprises réelles et dynamiques dans le secteur "${sector}" et la région "${region}" qui recrutent ou collaborent avec des talents Full-Stack / Backend / Mobile en remote ou télémigration.
+
+Réponds STRICTEMENT avec un tableau JSON valide au format suivant, sans aucun bloc de texte markdown autour :
+[
+  {
+    "name": "Nom de l'entreprise",
+    "website": "https://site-officiel.com",
+    "country": "Pays ou Ville / Remote",
+    "flag": "Drapeau emoji correspondant (ex: 🇫🇷, 🇳🇬, 🇺🇸, 🇬🇭, 🇨🇦, 🇰🇪, 🌍)",
+    "recipient": "email de contact probable ou générique (ex: careers@..., contact@..., talent@...)",
+    "description": "Courte description en 2 phrases de ce que fait l'entreprise et son impact",
+    "techStack": "Technologies principales utilisées (ex: React, Node.js, Python, PostgreSQL, Go)",
+    "whyFit": "Pourquoi le profil de Bhilal apporte une valeur directe et évidente pour eux",
+    "notes": "Conseil d'approche pour le premier contact"
+  }
+]`;
+
+    const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const geminiRes = await fetch(geminiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.4 }
+      })
+    });
+
+    if (!geminiRes.ok) {
+      // Fallback avec gemini-1.5-flash ou modèle disponible
+      const fallbackEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const fallbackRes = await fetch(fallbackEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.4 }
+        })
+      });
+      if (!fallbackRes.ok) {
+        throw new Error('Erreur de communication avec le service Gemini');
+      }
+      const fData = await fallbackRes.json();
+      var rawText = fData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+    } else {
+      const gData = await geminiRes.json();
+      var rawText = gData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+    }
+
+    // Nettoyer d'éventuels ```json ... ```
+    const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    let discovered = [];
+    try {
+      discovered = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error('Erreur parsing JSON Gemini discover:', parseErr, cleaned);
+      return res.status(500).json({ error: 'Réponse IA non exploitable.' });
+    }
+
+    const formatted = discovered.map((d, index) => ({
+      ...d,
+      id: `ai_${Date.now()}_${index}_${(d.name || '').toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+      status: 'READY',
+      sentDate: null
+    }));
+
+    res.json({ prospects: formatted, count: formatted.length });
+  } catch (error) {
+    console.error('Erreur discover-ai:', error);
+    res.status(500).json({ error: error.message || 'Erreur lors de la découverte IA de prospects.' });
+  }
+});
+
 export default router;
