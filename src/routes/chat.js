@@ -124,7 +124,7 @@ async function callOpenRouter(messages, apiKey) {
           model: model,
           messages: formattedMessages,
           temperature: 0.6,
-          max_tokens: 2048
+          max_tokens: 1500
         })
       });
 
